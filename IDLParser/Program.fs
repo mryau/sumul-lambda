@@ -1,13 +1,12 @@
-﻿//#r @"D:\Projects\IDLParser\packages\FParsec-Big-Data-Edition.1.0.1\lib\net40-client\FParsecCS.dll";;
+﻿module Main
+//#r @"D:\Projects\IDLParser\packages\FParsec-Big-Data-Edition.1.0.1\lib\net40-client\FParsecCS.dll";;
 //#r @"D:\Projects\IDLParser\packages\FParsec-Big-Data-Edition.1.0.1\lib\net40-client\FParsec.dll";;
+//#load @"D:\Projects\IDLParser\IDLParser\FsJson.fs"
+//#load @"D:\Projects\IDLParser\IDLParser\FsJsonDescription.fs"
 open System
+open System.IO
 open System.Collections.Generic
 open FParsec
-
-type IDL =
-    |Library of string * IDL list
-    |ImportLib of string
-    |ImportAlias of string
 
 type Prg =
     |Lambda of string*Expr
@@ -27,9 +26,35 @@ and Expr =
     |Xor of Expr*Expr
     |Plus of Expr*Expr
 
+let lookup cont k = List.find (fst >> ((=) k)) cont |> snd
+let rec eval cont = function
+    |Zero -> 0L
+    |One -> 1L
+    |Id s -> lookup cont s
+    |If0 (e1,e2,e3) ->
+        if 0L = eval cont e1 then eval cont e2 else eval cont e3
+    |Fold (e0,e1,id1,id2,e2) ->
+        let rec eval' n vn acc =
+            if n < 8 then
+                let v = (vn >>> n) &&& 0xFFL
+                let acc' = eval ((id1,v)::(id2,acc)::cont) e2
+                eval' (n+1) vn acc'
+            else
+                acc
+        eval' 0 (eval cont e0) (eval cont e1)
+    |Not e -> -1L - (eval cont e)
+    |Shl1 e -> (eval cont e) <<< 1
+    |Shr1 e -> (eval cont e) >>> 1
+    |Shr4 e -> (eval cont e) >>> 4
+    |Shr16 e -> (eval cont e) >>> 16
+    |And (e1, e2) -> (eval cont e1) &&& (eval cont e2)
+    |Or (e1, e2) -> (eval cont e1) ||| (eval cont e2)
+    |Xor (e1, e2) -> (eval cont e1) ^^^ (eval cont e2)
+    |Plus (e1, e2) -> (eval cont e1) + (eval cont e2)
+
 let ws = spaces
 let str s = pstring s >>. ws
-let idStr = many1Satisfy isLetter .>>. many1Satisfy (fun c -> isLetter c || isDigit c || c = '_') .>> ws |>> (fun (s1,s2) -> s1+s2)
+let idStr = many1Satisfy isLetter .>>. manySatisfy (fun c -> isLetter c || isDigit c || c = '_') .>> ws |>> (fun (s1,s2) -> s1+s2)
 
 let (expr: Parser<Expr, 'a>), exprRef = createParserForwardedToRef()
 
@@ -52,7 +77,7 @@ let shr16_op = str "shr16" >>. expr |>> Shr16
 let shr1_op = str "shr1" >>. expr |>> Shr1
 let shr4_op = str "shr4" >>. expr |>> Shr4
 let and_op = str "and" >>. expr .>>. expr |>> And
-let or_op = str "or" >>. expr .>>. expr |>> And
+let or_op = str "or" >>. expr .>>. expr |>> Or
 let xor_op = str "xor" >>. expr .>>. expr |>> Xor
 let plus_op = str "plus" >>. expr .>>. expr |>> Plus
 
@@ -71,11 +96,31 @@ let prog =
 
 let s = "(lambda (x_40004) (fold (if0 (plus (not 1) (or 1 x_40004)) 1 x_40004) 1 (lambda (x_40005 x_40006) (if0 x_40006 x_40005 x_40005))))"
 
-let test p str =
+let test n p str =
     match run p str with
-    | Success(result, _, _)   -> printfn "Success: %A" result
+    | Success(Lambda (v,expr), _, _)   ->
+        printfn "Success: %s: %A" v expr
+        let r = eval [v, n] expr
+        printfn "Success: %s -> %d" v r
     | Failure(errorMsg, _, _) -> printfn "Failure: %s" errorMsg
 
-test prog s
+//test prog s
+
+let reader fname =
+    seq { use reader = new StreamReader(File.OpenRead(fname))
+          while not reader.EndOfStream do
+              let s = reader.ReadLine()
+              //printfn "got %s" s
+              yield FsJson.parse s }
+
+let fname = @"I:\Lang\icfp\2013\training_programs.json"
+//let tests = File.ReadAllText(fname)
+//let utf8 = File.ReadAllText(fname, System.Text.Encoding.UTF8)
+let tests = reader fname
+for j in tests do
+    //let j = FsJson.parse s
+    test 0L prog j?challenge.Val
+
+test 0x1122334455667788L prog "(lambda (x) (fold x 0 (lambda (y z) (or y z))))"
 
 System.Console.Read() |> ignore
