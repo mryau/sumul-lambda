@@ -154,8 +154,8 @@ let rec doit t =
                         yield ("("+op+" "+v1+" "+v2+")")
     }
 
-let t1 = Op1 ("shr4", Op2 ("plus",Term,Term))
-let t2 = Op2 ("plus", Term, Op1 ("shr4", Term))
+let t1 = Op1 ("shr16", Op2 ("plus",Term,Term))
+let t2 = Op2 ("plus", Term, Op1 ("shr16", Term))
 
 //Array.ofSeq (doit t1);;
 for t in [t1;t2] do
@@ -166,7 +166,7 @@ for t in [t1;t2] do
                     "id", jval id
                     "program", jval ("(lambda (x) "+s+")")
                 ]
-        let id = "Rbny9NZuQE1URWimmvz966HP"
+        let id = "zUHt7zhKKVP0CLpLGrz85Ivl"
         let q5 = jGuess5 id |> FsJson.serialize |> Guess
         let s5 = doQuery q5
         let r5 = FsJson.parse s5
@@ -185,7 +185,7 @@ let rec permute = function
   | [] -> [[]]
   | e::xs -> List.collect (distribute e) (permute xs)
 
-for s1::s2::s3::[] in permute ["not";"not";"shr4"] do
+for s1::s2::s3::[] in permute ["not";"shr1";"shr4"] do
     for s in doit (Op1 (s1, Op1 (s2, Op1 (s3, Term)))) do
         let jGuess5 id =
             jval
@@ -193,7 +193,7 @@ for s1::s2::s3::[] in permute ["not";"not";"shr4"] do
                     "id", jval id
                     "program", jval ("(lambda (x) "+s+")")
                 ]
-        let id = "Rbny9NZuQE1URWimmvz966HP"
+        let id = "wpGphG4OoL5SMaz9JQf8ZItB"
         let q5 = jGuess5 id |> FsJson.serialize |> Guess
         let s5 = doQuery q5
         let r5 = FsJson.parse s5
@@ -212,3 +212,81 @@ for s1::s2::s3::[] in permute ["not";"not";"shr4"] do
 //KeBuniWZ5vyiAlWl6AipvdL8 (or x (not 1))
 //Niv851IGG0wNbVOCrccaAiHB (shl1 (or x x))
 //R3o7f3FJbNq990Qahll0QZyU (shr4 (plus x 0))
+//Rbny9NZuQE1URWimmvz966HP (not (not (shr4 x)))
+//VToCZrqsE8atq5Wj8h0GcIB1 (shr16 (xor x 0))
+//WJGNYtJJIy5hMJzBAMYvRsmR (shr16 (or x x))
+//XHYzh5JITpl0EiZSEn6jFLLV (shr1 (xor x 0))
+//ab0o5Xb8vBAxvW8oHo6TiZYB (and x (shr1 x))
+//bQPi5crb5Nk1CFt7cASXkdBi (and x (shl1 x))
+//iB8X0uWMUZNZ9p3Q6rmmQ4Yq (xor x (shr1 x))
+//o59jAxIwIIAg4ZlslyOn5IFg (shr1 (shr1 (shr16 x)))
+//of91shLnVpykAimwBPm465QO (or x (shl1 x))
+//uhTEPh0RnIUcaWjHwB4Ktnkg (not (shr16 (shr4 x)))
+//wpGphG4OoL5SMaz9JQf8ZItB (shr1 (shr4 (not x)))
+//zUHt7zhKKVP0CLpLGrz85Ivl (plus x (shr16 x))
+
+
+let f6 id s =
+    let start = System.DateTime.Now
+    let jGuess6 =
+        jval
+            [
+                "id", jval id
+                "program", jval ("(lambda (x) "+s+")")
+            ]
+    let q6 = jGuess6 |> FsJson.serialize |> Guess
+    let s6 = doQuery q6
+    let r6 = FsJson.parse s6
+    match r6?status.Val with
+        |"error" -> printfn "%s: %s: %s" s r6?status.Val r6?message.Val
+        |"mismatch" ->
+            let arr = r6?values.Array
+            printfn "%s: %s: inp: %s res: %s guess: %s" s r6?status.Val arr.[0].Val arr.[1].Val arr.[2].Val
+        |"win" ->
+            printfn "%s %s" id s
+            failwith "Ok"
+    let stop = System.DateTime.Now
+    let ts = stop-start
+    if ts.Seconds < 4 then
+        System.Threading.Thread.Sleep(4000-ts.Seconds*1000-ts.Milliseconds)
+
+let id = "yseEUyFdcWnlfKKlaVsYE9FO"
+for s1::s2::[] in permute ["shl1";"shl1"] do
+    for s in doit (Op1 (s1, Op1 (s2, Op2 ("xor", Term, Term)))) do
+        f6 id s
+    for s in doit (Op1 (s1, Op2 ("xor", Term, Op1 (s2, Term)))) do
+        f6 id s
+    for s in doit (Op2 ("xor", Term, Op1 (s1, Op1 (s2, Term)))) do
+        f6 id s
+    for s in doit (Op2 ("xor", Op1 (s1, Term), Op1 (s2, Term))) do
+        f6 id s
+
+let id1 = "yseEUyFdcWnlfKKlaVsYE9FO"
+for s1::s2::[] in permute ["xor";"xor"] do
+    for s in doit (Op2 (s1, Op2 (s2, Term, Term), Term)) do
+        f6 id1 s
+    for s in doit (Op2 (s1, Op2 (s1, Term, Term), Term)) do
+        f6 id1 s
+    for s in doit (Op2 (s2, Op2 (s2, Term, Term), Term)) do
+        f6 id1 s
+
+//3YNeaANpWGjF87HQWOziTJnR (xor x (shl1 (shr1 x)))
+//- CdJCrj2h4yJfSVo59IgQHliz
+//DpFhvv8EG78tGWJNs6uYNmOV (shr4 (shr16 (or x x)))
+//EaokkhLsXRA3a4Lt9EpFcJl5 (and x (shr4 (shr4 x)))
+//I1KgUA35NO1nLsgp2y6Phr9V (xor (or x 1) x)
+//? {"id":"RCvFDBNCAmQsu0ORB9Ag3j9Y","size":6,"operators":["if0","shl1"]}
+//UTNV4Uiq05XDGNmDAivkAjZw (and (plus x x) x)
+//- WlBy7dYGx0DBTiS5vnWDSfDk !!!error ???
+//Xq3zXxdskhZ84X0hMSQohBWn (plus x (shr16 (not x)))
+//c9vwZZXbNDLzpOsDusshFVNj (shr4 (shr16 (and x x)))
+//- cY4oBq5QDvbV5UzRMVN1eqFx
+//f4M3hPK3SqPlQ13H81oAAw00 (and (xor x 1) x)
+//fo8CuBeDy4hAA12dRZzSRJ2z (and x (shr16 (not x)))
+//id2oSNKz7xyRRDatqm9AUd0c (and (or x x) 1)
+//? {"id":"ki85WBfrBh8AvFM04sjBW6Yq","size":6,"operators":["if0","shr16"]}
+//l0KCRh2ic9PTweRJT6SOL3Q6 (shl1 (not (plus x x)))
+//mf8YVn9MN0TxwjYGvbgrLkCz (shr16 (shr16 (and x x)))
+//io3OUmCKBfOy7wUZDrQ4tRv (shr4 (not (or x x)))
+//y4NQWBMCG4tDyFGDAteuvnj6 (plus (xor x 1) 0)
+//- yseEUyFdcWnlfKKlaVsYE9FO
