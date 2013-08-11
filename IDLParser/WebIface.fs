@@ -280,3 +280,57 @@ for s1' in doit (Op1 (s, Term)) do
         for s3' in doit (Op1 (s, Term)) do
             for s1::s2::s3::[] in permute [s1';s2';s3'] do
                 f6 id1 (sprintf "(if0 %s %s %s)" s1 s2 s3)
+
+let combine cost ops = 
+    let rec comb cost acc ops unused_ops = 
+        seq {
+            match ops with
+                |_ when cost < 0 -> ()
+                |[] when cost = 0 && unused_ops = [] -> yield acc
+                |op::ops' ->
+                    let unused_ops' = (List.filter ((<>) op) unused_ops)
+                    match op with
+                        |Op1 (s,tree) ->
+                            for t in comb (cost-2) (Op1 (s,Term)::acc) ops unused_ops' do
+                                yield t
+                            for tlist in comb (cost-1) [] ops unused_ops' do
+                                for t in tlist do
+                                    //for t2 in comb (cost-1) (Op1 (s,t)::acc) ops unused_ops' do
+                                    yield Op1 (s,t)::acc
+                        |Op2 (s,tree1, tree2) ->
+                            for t in comb (cost-3) (Op2 (s,Term,Term)::acc) ops unused_ops' do
+                                yield t
+                            for tlist in comb (cost-1) [] ops unused_ops' do
+                                for t in tlist do
+                                    //comb (cost-3) (Op2 (s,Term,t)::acc) ops unused_ops'
+                                    //comb (cost-3) (Op2 (s,t,Term)::acc) ops unused_ops'
+                                    yield Op2 (s,Term,t)::acc
+                                    //все операции нечуствительны к порядку аргументов
+                                    //yield Op2 (s,t,Term)::acc
+                        |_ -> ()
+                    for t in comb cost acc ops' unused_ops do
+                        yield t
+                |_ -> ()
+        }
+
+    let rec count_cost = function
+    |Term -> 1
+    |Op1 (_,t) -> 1 + count_cost t
+    |Op2 (_,t1,t2) -> 1 + count_cost t1 + count_cost t2
+
+    seq {
+        for ops' in permute ops do
+            for tlist in comb cost [] ops' ops do
+                for t in tlist do
+                    if cost = count_cost t then
+                        yield t
+    }
+
+let id = "0WyiqPvvM3GUulouL4YXtbRM"
+for tlist in combine (7-1) [Op1("shr4",Term); Op2("plus",Term,Term)] do
+    for s in doit t do
+        f6 id s
+
+    [[Op1 ("shr4",Op2 ("plus",Term,Term)); Op1 ("shr4",Term)];
+     [Op2 ("plus",Term,Op2 ("plus",Term,Term)); Op1 ("shr4",Term)];
+     [Op1 ("shr4",Op2 ("plus",Term,Term))]; [Op1 ("shr4",Op1 ("shr4",Term))];
