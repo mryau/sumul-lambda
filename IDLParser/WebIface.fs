@@ -359,12 +359,132 @@ let combine cost ops =
                 yield t
     }
 
-let id = "0WyiqPvvM3GUulouL4YXtbRM"
+let f7 id s rtests =
+    let start = System.DateTime.Now
+    let jGuess6 =
+        jval
+            [
+                "id", jval id
+                "program", jval ("(lambda (x) "+s+")")
+            ]
+    let q6 = jGuess6 |> FsJson.serialize |> Guess
+    let s6 = doQuery q6
+    let r6 = FsJson.parse s6
+    match r6?status.Val with
+        |"error" -> printfn "%s: %s: %s" s r6?status.Val r6?message.Val
+        |"mismatch" ->
+            let arr = r6?values.Array
+            printfn "%s: %s: inp: %s res: %s guess: %s" s r6?status.Val arr.[0].Val arr.[1].Val arr.[2].Val
+            let s1 = arr.[0].Val.[2..]
+            let s2 = arr.[1].Val.[2..]
+            let inp = System.Int64.Parse (s1,  System.Globalization.NumberStyles.AllowHexSpecifier)
+            let res = System.Int64.Parse (s2,  System.Globalization.NumberStyles.AllowHexSpecifier)
+            rtests := (uint64(inp),uint64(res))::!rtests
+        |"win" ->
+            printfn "%s %s" id s
+            failwith "Ok"
+    let stop = System.DateTime.Now
+    let ts = stop-start
+    if ts.Seconds < 4 then
+        System.Threading.Thread.Sleep(4000-ts.Seconds*1000-ts.Milliseconds)
+
+let id = "y7yLqafiW4qK3bNW4Wn1m1Fe"
 let mutable set = Set.empty
-for t in combine (7-2) [Op1("shr4",Term); Op2("plus",Term,Term)] do
+//for t in combine (7-2) [Op1("shr16",Term); Op2("and",Term,Term)] do
+for t in combine (7-2) [Op2("plus",Term,Term); Op1("shr16",Term); Op2("xor",Term,Term)] do
+//for t in combine (7-2) [Op2("or",Term,Term); Op1("shl1",Term); Op1("shr1",Term); Op1("shr16",Term)] do
     set <- set.Add t
+let rtests = ref []
+
+let rec should_test s = function
+    |[] -> true
+    |(inp,res)::xs ->
+        if res = test inp prog s then
+            should_test s xs
+        else
+            false
+
 for t in set do
     for s in doit t do
-        //f6 id s
-        printfn "%A" s
+        let str = sprintf "(lambda (x) %s)" s
+        if should_test str !rtests then
+            f7 id s rtests
 
+// 7:
+//- 0WyiqPvvM3GUulouL4YXtbRM
+//- 660XubzPVwPRzvLYVncwQ0Zq
+//6KrqF5VK5MvOfSVcMkmAmPQw (and x (xor x (shl1 x)))
+//? {"id":"BV6C7W6ABZvPHthJFBVJGyIA","size":7,"operators":["and","if0"]}
+//BlxGrKZrmVv7pFeNwJ9Zz39M (plus x (plus x (shr1 0)))
+//CpygXjUcA8UBcy9RVpKhva29 (or x (xor 1 (shr4 0)))
+//EgYbCyGd5AqTqxTvIjUI0KcX (plus x (shl1 (plus 1 1)))
+//OlebLM58BAvx42PBQ2VwoNBh (and (not (shr16 x)) (shl1 1))
+//- ? {"id":"Ra2BJZPAGifIVIDi98zziZKQ","size":7,"operators":["and","shl1","shr16"]}
+//TIcydjZRBOuD7WRl9EA3KljQ (and x (not (plus 0 1)))
+//V1q5g5y24huc7HGFZRlW1EQY (not (shl1 (or 1 (shl1 x))))
+//haPKQBYchjO72Hly5cCkbFZz (and x (xor 1 (shr4 x)))
+//jPgBWXlsz3NVzvHxSBp0a83h (or x (shl1 (shr1 (shr16 x))))
+//kUY57Anksh4jZrymgOmDIc8T (xor x (plus x (shl1 x)))
+//nk3XthgliSUeEulAQJeA5abe (and 1 (not (plus x 0)))
+//rRgW96xqTW3Lk9Hl7RmVbe1T (plus (shr1 0) (xor x 1))
+//vMEGutoARyg1wPm6O9ybTJXI (not (plus x (xor 0 1)))
+//xWYTHBKBg1S7UWcFs8pZTRHH (plus 1 (shr16 (and x x)))
+//xj26dwzLrNAjRXC0LDrjv2Ig (and x (shr16 (and x x)))
+//- ? {"id":"y7yLqafiW4qK3bNW4Wn1m1Fe","size":7,"operators":["plus","shr16","xor"]}
+
+let ops1 = [|"not";"shl1";"shr1";"shr4";"shr16"|]
+let ops2 = [|"and";"or";"xor";"plus"|]
+
+let filter = function
+    |JsonString s when None <> Array.tryFind (fun elem -> s = elem) ops -> true
+    |_ -> false
+
+let json2op = function
+    |JsonString s ->
+        if None <> Array.tryFind (fun elem -> s = elem) ops1 then
+            Op1(s,Term)
+        else
+            Op2(s,Term,Term)
+    |_ -> failwith "unknown op"
+
+for v in j.Array do
+    if v?size.Val = "8" && Array.forall filter v?operators.Array then
+        //printfn "%s: %A" v?id.Val v?operators.Array
+        let id = v?id.Val
+        let ops = Array.map json2op v?operators.Array |> Array.toList
+        //printfn "%s: %A" id ops
+        let mutable set = Set.empty
+        for t in combine (8-2) ops do
+            set <- set.Add t
+        let rtests = ref []
+
+        try
+            for t in set do
+                for s in doit t do
+                    let str = sprintf "(lambda (x) %s)" s
+                    if should_test str !rtests then
+                        f7 id s rtests
+        with
+        | ex -> printfn "%s" (ex.ToString())
+        printfn "done for id %s" id
+        System.Console.Read() |> ignore
+
+//8 :
+//9ZKAi6pnA3vceBgzckpRkB4P (and 1 (and 1 (xor x 1)))
+//B1355vkPjIhFCVBifCPl9P1r (or 0 (or 0 (plus x 1)))
+//BXG0ND4ZFcKy3qS6kfVMRiDP (or (shr4 0) (xor 1 (shr1 x)))
+//DAAOQhEF32AZYecmmCBBNCmP (xor x (shl1 (shr4 (plus x x))))
+//EoZypGj6TdmqFerSykR0Cw5w (shr16 (plus 1 (shr4 (xor x 0))))
+//P0bwRupnbk72Xe4EZI0yg7LZ (not (shl1 (or x (plus x 0))))
+//POhtjNU2iXEgeaNd1qcJ3SQ4 (and 1 (shr16 (shr4 (plus x 0))))
+//Y18FWmFujq3jlKx7Qp4mn6AA (shr1 (shr16 (shr4 (not (plus x 0)))))
+//YMYJSuOsD52E17gMfFDrp88V (or 0 (plus x (xor x 0)))
+//aQ4Mw3aGqXQvech6TOAYcCsY (or 0 (plus x (or x 1)))
+//dvVuVBa3Pr8AK1A5O73LxMXp (not (not (not (shl1 (or x 1)))))
+//kWjVEyghWModURc1Tte2KOi6 (xor x (shr4 (xor x (shl1 0))))
+//m4VNzGCvGRPvHl3mT9XViPrk (and x (or (shr1 x) (shr4 x)))
+//mfwjvGRBgRO02KHiDMeABiB1 (shr16 (shl1 (or x (plus x 0))))
+//pV4YAz7TNztAVIlZkoJgM9rN (plus (shr1 (shr16 x)) (shr4 (shl1 x)))
+//uKPd0mTSBDzpEJqRGmC7cDQD (or 0 (plus x (and x 1)))
+//xXG8fJwTym5AiroB1XjAisJY (not (plus (shr1 0) (xor x 1)))
+//yy3BvsRZgjFFTplQCrC24p1J (or (shr1 0) (xor x (shr16 x)))
