@@ -160,22 +160,7 @@ let t2 = Op2 ("plus", Term, Op1 ("shr16", Term))
 //Array.ofSeq (doit t1);;
 for t in [t1;t2] do
     for s in doit t do
-        let jGuess5 id =
-            jval
-                [
-                    "id", jval id
-                    "program", jval ("(lambda (x) "+s+")")
-                ]
-        let id = "zUHt7zhKKVP0CLpLGrz85Ivl"
-        let q5 = jGuess5 id |> FsJson.serialize |> Guess
-        let s5 = doQuery q5
-        let r5 = FsJson.parse s5
-        if r5?status.Val = "win" then
-            printfn "win: %s %s" id s
-            failwith "Ok"
-        else
-            printfn "fig: %s %s" r5?status.Val s
-            System.Console.Read() |> ignore
+        f6 id s
 
 let rec distribute e = function
   | [] -> [[e]]
@@ -187,22 +172,7 @@ let rec permute = function
 
 for s1::s2::s3::[] in permute ["not";"shr1";"shr4"] do
     for s in doit (Op1 (s1, Op1 (s2, Op1 (s3, Term)))) do
-        let jGuess5 id =
-            jval
-                [
-                    "id", jval id
-                    "program", jval ("(lambda (x) "+s+")")
-                ]
-        let id = "wpGphG4OoL5SMaz9JQf8ZItB"
-        let q5 = jGuess5 id |> FsJson.serialize |> Guess
-        let s5 = doQuery q5
-        let r5 = FsJson.parse s5
-        if r5?status.Val = "win" then
-            printfn "win: %s %s" id s
-            failwith "Ok"
-        else
-            printfn "fig: %s %s" r5?status.Val s
-            System.Console.Read() |> ignore
+        f6 id s
 
 //- 4dC9n4EECTLg7OCJyjxOvhhs
 //84rOkDe5Abx0BSlaqgLzMtSB (shl1 (plus x 0))
@@ -275,7 +245,7 @@ for s1::s2::[] in permute ["xor";"xor"] do
 //DpFhvv8EG78tGWJNs6uYNmOV (shr4 (shr16 (or x x)))
 //EaokkhLsXRA3a4Lt9EpFcJl5 (and x (shr4 (shr4 x)))
 //I1KgUA35NO1nLsgp2y6Phr9V (xor (or x 1) x)
-//? {"id":"RCvFDBNCAmQsu0ORB9Ag3j9Y","size":6,"operators":["if0","shl1"]}
+//- ? {"id":"RCvFDBNCAmQsu0ORB9Ag3j9Y","size":6,"operators":["if0","shl1"]}
 //UTNV4Uiq05XDGNmDAivkAjZw (and (plus x x) x)
 //- WlBy7dYGx0DBTiS5vnWDSfDk !!!error ???
 //Xq3zXxdskhZ84X0hMSQohBWn (plus x (shr16 (not x)))
@@ -284,9 +254,29 @@ for s1::s2::[] in permute ["xor";"xor"] do
 //f4M3hPK3SqPlQ13H81oAAw00 (and (xor x 1) x)
 //fo8CuBeDy4hAA12dRZzSRJ2z (and x (shr16 (not x)))
 //id2oSNKz7xyRRDatqm9AUd0c (and (or x x) 1)
-//? {"id":"ki85WBfrBh8AvFM04sjBW6Yq","size":6,"operators":["if0","shr16"]}
+//{"id":"ki85WBfrBh8AvFM04sjBW6Yq","size":6,"operators":["if0","shr16"]} (if0 x (shr16 (shr16 x)) (shr16 x))
 //l0KCRh2ic9PTweRJT6SOL3Q6 (shl1 (not (plus x x)))
 //mf8YVn9MN0TxwjYGvbgrLkCz (shr16 (shr16 (and x x)))
 //io3OUmCKBfOy7wUZDrQ4tRv (shr4 (not (or x x)))
 //y4NQWBMCG4tDyFGDAteuvnj6 (plus (xor x 1) 0)
 //- yseEUyFdcWnlfKKlaVsYE9FO
+
+let id1 = "ki85WBfrBh8AvFM04sjBW6Yq"
+let s = "shr16"
+for s1' in doit (Op1 (s, (Op1 (s, (Op1 (s, Term)))))) do
+    for s2' in doit Term do
+        for s3' in doit Term do
+            for s1::s2::s3::[] in permute [s1';s2';s3'] do
+                f6 id1 (sprintf "(if0 %s %s %s)" s1 s2 s3)
+
+for s1' in doit (Op1 (s, (Op1 (s, Term)))) do
+    for s2' in doit (Op1 (s, Term)) do
+        for s3' in doit Term do
+            for s1::s2::s3::[] in permute [s1';s2';s3'] do
+                f6 id1 (sprintf "(if0 %s %s %s)" s1 s2 s3)
+
+for s1' in doit (Op1 (s, Term)) do
+    for s2' in doit (Op1 (s, Term)) do
+        for s3' in doit (Op1 (s, Term)) do
+            for s1::s2::s3::[] in permute [s1';s2';s3'] do
+                f6 id1 (sprintf "(if0 %s %s %s)" s1 s2 s3)
