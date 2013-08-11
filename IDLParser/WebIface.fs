@@ -447,27 +447,28 @@ let json2op = function
             Op2(s,Term,Term)
     |_ -> failwith "unknown op"
 
-for v in j.Array do
-    if v?size.Val = "8" && Array.forall filter v?operators.Array then
-        //printfn "%s: %A" v?id.Val v?operators.Array
-        let id = v?id.Val
-        let ops = Array.map json2op v?operators.Array |> Array.toList
-        //printfn "%s: %A" id ops
-        let mutable set = Set.empty
-        for t in combine (8-2) ops do
-            set <- set.Add t
-        let rtests = ref []
+for i in 9..30 do
+    for v in j.Array do
+        if v?size.Val = (string i) && Array.forall filter v?operators.Array then
+            //printfn "%s: %A" v?id.Val v?operators.Array
+            let id = v?id.Val
+            let ops = Array.map json2op v?operators.Array |> Array.toList
+            printfn "%d: %s: %A" i id ops
+            let mutable set = Set.empty
+            for t in combine (i-2) ops do
+                set <- set.Add t
+            let rtests = ref []
 
-        try
-            for t in set do
-                for s in doit t do
-                    let str = sprintf "(lambda (x) %s)" s
-                    if should_test str !rtests then
-                        f7 id s rtests
-        with
-        | ex -> printfn "%s" (ex.ToString())
-        printfn "done for id %s" id
-        System.Console.Read() |> ignore
+            try
+                for t in set do
+                    for s in doit t do
+                        let str = sprintf "(lambda (x) %s)" s
+                        if should_test str !rtests then
+                            f7 id s rtests
+            with
+            | ex -> printfn "%s" (ex.ToString())
+            printfn "done for id %s" id
+            System.Console.Read() |> ignore
 
 //8 :
 //9ZKAi6pnA3vceBgzckpRkB4P (and 1 (and 1 (xor x 1)))
