@@ -121,9 +121,8 @@ let fname = @"I:\Lang\icfp\2013\training_programs.json"
 let tests = reader fname
 for j in tests do
     //let j = FsJson.parse s
-    test 0UL prog j?challenge.Val
 
-let ops = [|"not";"shl1";"shr1";"shr4";"shr16";"and";"or";"xor";"plus"|]
+let ops = [|"not";"shl1";"shr1";"shr4";"shr16";"and";"or";"xor";"plus"; "if0"|]
 let filter = function
     |JsonString s when None <> Array.tryFind (fun elem -> s = elem) ops -> true
     |_ -> false

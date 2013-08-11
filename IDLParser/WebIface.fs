@@ -138,6 +138,7 @@ type Tree =
     |Term
     |Op1 of string*Tree
     |Op2 of string*Tree*Tree
+    |If0 of Tree*Tree*Tree
 
 let rec doit t =
     seq {
@@ -152,6 +153,11 @@ let rec doit t =
                 for v1 in doit t1 do
                     for v2 in doit t2 do
                         yield ("("+op+" "+v1+" "+v2+")")
+            |If0 (t1,t2,t3) ->
+                for v1 in doit t1 do
+                    for v2 in doit t2 do
+                        for v3 in doit t3 do
+                        yield ("(if0 "+v1+" "+v2+" "+v3+")")
     }
 
 let t1 = Op1 ("shr16", Op2 ("plus",Term,Term))
@@ -285,6 +291,7 @@ let combine cost ops =
     let op_cost = function
     |Op1(_,_) -> 1
     |Op2(_,_,_) -> 2
+    |If0(_,_,_) -> 3
     |node -> failwith (sprintf "unknown op %A" node)
 
     let rec updater tree node =
@@ -306,6 +313,7 @@ let combine cost ops =
             |Op2(s1,tree1,tree2), Op1(s2,_) ->
                 yield Op2(s1,tree1,Op1(s2,tree2))
                 yield Op2(s1,Op1(s2,tree1),tree2)
+                yield Op1(s2, Op2(s1,tree1,tree2))
                 for t in updater tree1 node do
                     yield Op2(s1, t, tree2)
                 for t in updater tree2 node do
@@ -325,6 +333,99 @@ let combine cost ops =
                     yield Op2(s1, tree1, t)
             |Term,Op1(s2,_) -> yield Op1(s2,Term)
             |Term,Op2(s2,_,_) -> yield Op2(s2,Term,Term)
+            |Term,If0(_,_,_) -> yield If0(Term,Term,Term)
+            |If0(tree1,tree2,tree3), Op1(s2,_) ->
+                yield If0(tree1,tree2,Op1(s2,tree3))
+                yield If0(tree1,Op1(s2,tree2),tree3)
+                yield If0(Op1(s2,tree1),tree2,tree3)
+                yield Op1(s2,If0(tree1,tree2,tree3))
+                for t in updater tree1 node do
+                    yield If0(t, tree2, tree3)
+                for t in updater tree2 node do
+                    yield If0(tree1, t, tree3)
+                for t in updater tree3 node do
+                    yield If0(tree1, tree2, t)
+            |If0(tree1,tree2,tree3), Op2(s2,_,_) ->
+                yield If0(tree1,tree2,Op2(s2,Term,tree3))
+                yield If0(tree1,Op2(s2,Term,tree2),tree3)
+                yield If0(Op2(s2,Term,tree1),tree2,tree3)
+                yield Op2(s2,Term,If0(tree1,tree2,tree3))
+                for t in updater tree1 node do
+                    yield If0(t, tree2, tree3)
+                for t in updater tree2 node do
+                    yield If0(tree1, t, tree3)
+                for t in updater tree3 node do
+                    yield If0(tree1, tree2, t)
+            |Op1(s1,tree'), If0(_,_,_) ->
+                yield Op1(s1,If0(tree',Term,Term))
+                yield Op1(s1,If0(Term,tree',Term))
+                yield Op1(s1,If0(Term,Term,tree'))
+                yield If0(Op1(s1,tree'),Term,Term)
+                yield If0(Term,Op1(s1,tree'),Term)
+                yield If0(Term,Term,Op1(s1,tree'))
+                for t in updater tree' node do
+                    yield Op1(s1, t)
+            |Op2(s2,tree1,tree2), If0(_,_,_) ->
+                yield If0(Term,Term,Op2(s2,tree1,tree2))
+                yield If0(Term,Op2(s2,tree1,tree2),Term)
+                yield If0(Op2(s2,tree1,tree2),Term,Term)
+
+                yield If0(tree1,tree2,Op2(s2,Term,Term))
+                yield If0(tree2,tree1,Op2(s2,Term,Term))
+                yield If0(tree1,Term,Op2(s2,Term,tree2))
+                yield If0(Term,tree1,Op2(s2,Term,tree2))
+                yield If0(tree2,Term,Op2(s2,Term,tree1))
+                yield If0(Term,tree2,Op2(s2,Term,tree1))
+
+                yield If0(tree1,Op2(s2,Term,Term),tree2)
+                yield If0(tree2,Op2(s2,Term,Term),tree1)
+                yield If0(tree1,Op2(s2,Term,tree2),Term)
+                yield If0(Term,Op2(s2,Term,tree2),tree1)
+                yield If0(tree2,Op2(s2,Term,tree1),Term)
+                yield If0(Term,Op2(s2,Term,tree1),tree2)
+                
+                yield If0(Op2(s2,Term,Term),tree1,tree2)
+                yield If0(Op2(s2,Term,Term),tree2,tree1)
+                yield If0(Op2(s2,Term,tree2),tree1,Term)
+                yield If0(Op2(s2,Term,tree2),Term,tree1)
+                yield If0(Op2(s2,Term,tree1),tree2,Term)
+                yield If0(Op2(s2,Term,tree1),Term,tree2)
+
+                yield Op2(s2,Term,If0(Term,tree1,tree2))
+                yield Op2(s2,Term,If0(tree1,Term,tree2))
+                yield Op2(s2,Term,If0(tree1,tree2,Term))
+                yield Op2(s2,Term,If0(Term,tree2,tree1))
+                yield Op2(s2,Term,If0(tree2,Term,tree1))
+                yield Op2(s2,Term,If0(tree2,tree1,Term))
+
+                yield Op2(s2,tree1,If0(Term,Term,tree2))
+                yield Op2(s2,tree1,If0(Term,tree2,Term))
+                yield Op2(s2,tree1,If0(tree2,Term,Term))
+
+                yield Op2(s2,tree2,If0(Term,Term,tree1))
+                yield Op2(s2,tree2,If0(Term,tree1,Term))
+                yield Op2(s2,tree2,If0(tree1,Term,Term))
+
+                for t in updater tree1 node do
+                    yield Op2(s2, t, tree2)
+                for t in updater tree2 node do
+                    yield Op2(s2, tree1, t)
+            |If0(tree1,tree2,tree3), If0(_,_,_) ->
+                yield If0(tree1,tree2,If0(Term,Term,tree3))
+                yield If0(tree1,tree2,If0(Term,tree3,Term))
+                yield If0(tree1,tree2,If0(tree3,Term,Term))
+                yield If0(tree1,If0(Term,Term,tree2),tree3)
+                yield If0(tree1,If0(Term,tree2,Term),tree3)
+                yield If0(tree1,If0(tree2,Term,Term),tree3)
+                yield If0(If0(Term,Term,tree1),tree2,tree3)
+                yield If0(If0(Term,tree1,Term),tree2,tree3)
+                yield If0(If0(tree1,Term,Term),tree2,tree3)
+                for t in updater tree1 node do
+                    yield If0(t, tree2, tree3)
+                for t in updater tree2 node do
+                    yield If0(tree1, t, tree3)
+                for t in updater tree3 node do
+                    yield If0(tree1, tree2, t)
             |node1, node2 -> failwith (sprintf "unknown nodes %A,%A" node1 node2)
         }
 
@@ -344,6 +445,7 @@ let combine cost ops =
     |Term -> 1
     |Op1 (_,t) -> 1 + count_cost t
     |Op2 (_,t1,t2) -> 1 + count_cost t1 + count_cost t2
+    |If0 (t1,t2,t3) -> 1 + count_cost t1 + count_cost t2 + count_cost t3
     (*
     seq {
         for ops' in permute ops do
@@ -388,10 +490,10 @@ let f7 id s rtests =
     if ts.Seconds < 4 then
         System.Threading.Thread.Sleep(4000-ts.Seconds*1000-ts.Milliseconds)
 
-let id = "y7yLqafiW4qK3bNW4Wn1m1Fe"
+let id = "BV6C7W6ABZvPHthJFBVJGyIA"
 let mutable set = Set.empty
 //for t in combine (7-2) [Op1("shr16",Term); Op2("and",Term,Term)] do
-for t in combine (7-2) [Op2("plus",Term,Term); Op1("shr16",Term); Op2("xor",Term,Term)] do
+for t in combine (7-2) [Op2("and",Term,Term); If0(Term,Term,Term)] do
 //for t in combine (7-2) [Op2("or",Term,Term); Op1("shl1",Term); Op1("shr1",Term); Op1("shr16",Term)] do
     set <- set.Add t
 let rtests = ref []
@@ -414,7 +516,7 @@ for t in set do
 //- 0WyiqPvvM3GUulouL4YXtbRM
 //- 660XubzPVwPRzvLYVncwQ0Zq
 //6KrqF5VK5MvOfSVcMkmAmPQw (and x (xor x (shl1 x)))
-//? {"id":"BV6C7W6ABZvPHthJFBVJGyIA","size":7,"operators":["and","if0"]}
+//BV6C7W6ABZvPHthJFBVJGyIA (and x (if0 x x 1))
 //BlxGrKZrmVv7pFeNwJ9Zz39M (plus x (plus x (shr1 0)))
 //CpygXjUcA8UBcy9RVpKhva29 (or x (xor 1 (shr4 0)))
 //EgYbCyGd5AqTqxTvIjUI0KcX (plus x (shl1 (plus 1 1)))
@@ -434,6 +536,7 @@ for t in set do
 
 let ops1 = [|"not";"shl1";"shr1";"shr4";"shr16"|]
 let ops2 = [|"and";"or";"xor";"plus"|]
+let ops3 = "if0"
 
 let filter = function
     |JsonString s when None <> Array.tryFind (fun elem -> s = elem) ops -> true
@@ -441,7 +544,9 @@ let filter = function
 
 let json2op = function
     |JsonString s ->
-        if None <> Array.tryFind (fun elem -> s = elem) ops1 then
+        if s = "if0" then
+            If0(Term,Term,Term)
+        elif None <> Array.tryFind (fun elem -> s = elem) ops1 then
             Op1(s,Term)
         else
             Op2(s,Term,Term)
@@ -468,7 +573,6 @@ for i in 9..30 do
             with
             | ex -> printfn "%s" (ex.ToString())
             printfn "done for id %s" id
-            System.Console.Read() |> ignore
 
 //8 :
 //9ZKAi6pnA3vceBgzckpRkB4P (and 1 (and 1 (xor x 1)))
